@@ -6,30 +6,27 @@ output RW;
 output [15:0] IA,DA;
 
 reg [1:0] STAGE;
-wire [15:0] RF [0:14]
+reg [15:0] RF [0:14];
 reg [15:0] INST, PC, FUA, FUB, FUC, LSUA, LSUB, LSUC, PCC, PCI;
-// reg [15:0] PC, PCI;
 reg FLAG, RW;
-wire [3:0] OPCODE;
-wire [3:0] OPR1, OPR2, OPR3;
+wire [3:0] OPCODE, OPR1, OPR2, OPR3;
 wire [7:0] IMM;
 wire [15:0] ABUS, BBUS, CBUS;
-wire FUA, FUB, FUC;
-wire LSUA, LSUB, LSUC;
+wire [15:0] PCn;
+wire [15:0] RF01, RF05;
 
-
-assign IA = PC
-assign RF = DD[14:0]
-// assign INST = ID
-assign OPCODE = INST[15:12]
+assign PCn = PC +1; 
+assign RF01 = RF[1];
+assign RF05 = RF[5];
+assign IA = PC;
+assign OPCODE = INST[15:12];
 assign OPR1 = INST[11:8];
 assign OPR2 = INST[7:4];
 assign OPR3 = INST[3:0];
-assign IMM = INST[7:0]
+assign IMM = INST[7:0];
 assign ABUS = (OPR2 == 0 ? 0:RF[OPR2]);
 assign BBUS = (OPR3 == 0 ? 0:RF[OPR3]);
-
-assign DD = (RW==0 ? LSUA:'bZ);
+assign DD = (RW==0 ? LSUA:16'bZ);
 assign DA = LSUB;
 assign CBUS = (OPCODE[3]==0 ? FUC:(OPCODE[3:1]=='b101 ? LSUC:
 (OPCODE=='b1100 ? {8'b 0, IMM}:OPCODE=='b1000 ? PCC:'bZ)));
@@ -55,7 +52,8 @@ always@(posedge CK)begin
             if(OPCODE[3:0]=='b1000 || (OPCODE[3:0]=='b1001 && FLAG ==1))begin
                 PCI <= BBUS;
             end else begin
-                PCI <= PC +1;
+                // PCI <= PC +1;
+                PCI <= PCn;
             end
             STAGE<=2;
         end else if(STAGE==2)begin
@@ -67,25 +65,25 @@ always@(posedge CK)begin
                 'b011:FUC <= FUA << FUB;
                 'b100:FUC <= FUA | FUB;
                 'b101:FUC <= FUA & FUB;
-                'b110:FCU <= ~FUA;
-                'b111:FCU <= FUA ~ FUB;
+                'b110:FUC <= ~FUA;
+                'b111:FUC <= FUA ^ FUB;
                 endcase
-            end
-            if(OPCODE[3:1]=='b101)begin
+            end else if(OPCODE[3:1]=='b101)begin
                 if(OPCODE[0]==0)begin
                     RW <= 0;
                 end else begin
                     RW <= 1;
                     LSUC <= DD;
                 end
-            end
-            if(OPCODE[3:0]=='b1000)begin
-                PCC <= PC +1;
+            end else if(OPCODE[3:0]=='b1000)begin
+                // PCC <= PC +1;
+                PCC <= PCn;
             end
             STAGE<=3;
         end else if(STAGE==3)begin
             RF[OPR1] <= CBUS;
             PC <= PCI;
+            RW <= 1;
             if(OPCODE[3]==0)begin
                 if(CBUS==0)FLAG<=1;
                 else FLAG<=0;
